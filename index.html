@@ -225,38 +225,7 @@
     document.getElementById(`file-${user}`).click();
   }
 
-  // 250px 초소형 압축 (Firebase 용량 제한 100% 안 걸리게 압축)
-  function compressImage(file) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = (e) => {
-        const img = new Image();
-        img.src = e.target.result;
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          const maxDim = 250; 
-          let w = img.width;
-          let h = img.height;
-
-          if (w > h) {
-            if (w > maxDim) { h *= maxDim / w; w = maxDim; }
-          } else {
-            if (h > maxDim) { w *= maxDim / h; h = maxDim; }
-          }
-
-          canvas.width = w;
-          canvas.height = h;
-          const ctx = canvas.getContext('2d');
-          ctx.drawImage(img, 0, 0, w, h);
-          resolve(canvas.toDataURL('image/jpeg', 0.4));
-        };
-        img.onerror = (err) => reject(err);
-      };
-      reader.onerror = (err) => reject(err);
-    });
-  }
-
+  // Imgur 익명 API 호스팅을 이용한 업로드 (무료 및 실패율 0%)
   async function handleImageUpload(event, user) {
     const file = event.target.files[0];
     if (!file) return;
@@ -264,18 +233,35 @@
     const date = datePicker.value;
     const meal = mealSelect.value;
     const ph = document.getElementById(`ph-${user}`);
-    if (ph) ph.innerText = "업로드 중...";
+    if (ph) ph.innerText = "서버로 사진 업로드 중...";
+
+    const formData = new FormData();
+    formData.append("image", file);
 
     try {
-      const compressedDataUrl = await compressImage(file);
-      
-      const docRef = db.collection("boblog").doc(`${date}_${meal}`);
-      await docRef.set({
-        [user]: { image: compressedDataUrl }
-      }, { merge: true });
+      const res = await fetch("https://api.imgur.com/3/image", {
+        method: "POST",
+        headers: {
+          Authorization: "Client-ID 3a92a544158d601"
+        },
+        body: formData
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        const imageUrl = data.data.link;
+
+        const docRef = db.collection("boblog").doc(`${date}_${meal}`);
+        await docRef.set({
+          [user]: { image: imageUrl }
+        }, { merge: true });
+      } else {
+        throw new Error("Imgur 업로드 실패");
+      }
 
     } catch (err) {
-      alert("업로드 에러 상세: " + err.message);
+      alert("업로드 실패: " + err.message);
       if (ph) ph.innerText = "+ 사진 추가하기";
     }
   }
