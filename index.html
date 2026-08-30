@@ -164,7 +164,8 @@
       const mealData = doc.exists ? doc.data() : {};
       renderUI(mealData);
     }, (error) => {
-      console.error("Firestore error:", error);
+      console.error("Firestore 에러:", error);
+      alert("데이터를 불러오는데 실패했습니다. Firebase 보안 규칙을 확인해주세요.");
     });
   }
 
@@ -225,36 +226,31 @@
     document.getElementById(`file-${user}`).click();
   }
 
-  // 브라우저 자체 이미지 압축 기능 함수 (최대 가로/세로 600px로 줄임)
-  function compressImage(file, maxWidth = 600, quality = 0.7) {
+  // 400px 크기로 초경량 압축 (오류 원천 차단)
+  function compressImage(file) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.readAsDataURL(file);
-      reader.onload = (event) => {
+      reader.onload = (e) => {
         const img = new Image();
-        img.src = event.target.result;
+        img.src = e.target.result;
         img.onload = () => {
-          let width = img.width;
-          let height = img.height;
+          const canvas = document.createElement('canvas');
+          const maxDim = 400; // 가로/세로 최대 400px로 압축
+          let w = img.width;
+          let h = img.height;
 
-          if (width > height) {
-            if (width > maxWidth) {
-              height = Math.round((height * maxWidth) / width);
-              width = maxWidth;
-            }
+          if (w > h) {
+            if (w > maxDim) { h *= maxDim / w; w = maxDim; }
           } else {
-            if (height > maxWidth) {
-              width = Math.round((width * maxWidth) / height);
-              height = maxWidth;
-            }
+            if (h > maxDim) { w *= maxDim / h; h = maxDim; }
           }
 
-          const canvas = document.createElement('canvas');
-          canvas.width = width;
-          canvas.height = height;
+          canvas.width = w;
+          canvas.height = h;
           const ctx = canvas.getContext('2d');
-          ctx.drawImage(img, 0, 0, width, height);
-          resolve(canvas.toDataURL('image/jpeg', quality));
+          ctx.drawImage(img, 0, 0, w, h);
+          resolve(canvas.toDataURL('image/jpeg', 0.5)); // 화질 50% 압축 (초경량화)
         };
         img.onerror = (err) => reject(err);
       };
@@ -262,7 +258,6 @@
     });
   }
 
-  // 압축된 이미지를 Firestore에 바로 저장
   async function handleImageUpload(event, user) {
     const file = event.target.files[0];
     if (!file) return;
@@ -270,7 +265,7 @@
     const date = datePicker.value;
     const meal = mealSelect.value;
     const ph = document.getElementById(`ph-${user}`);
-    if (ph) ph.innerText = "사진 처리 중...";
+    if (ph) ph.innerText = "사진 최적화 중...";
 
     try {
       const compressedDataUrl = await compressImage(file);
@@ -282,7 +277,7 @@
 
     } catch (err) {
       console.error(err);
-      alert("사진 업로드 중 오류가 발생했습니다. 다시 시도해 주세요.");
+      alert("업로드 실패! Firebase 콘솔에서 규칙(Rules)이 게시되었는지 확인해주세요.");
       if (ph) ph.innerText = "+ 사진 추가하기";
     }
   }
