@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>밥로그 (MealLog)</title>
+  <style>
+    :root {
+      --primary: #FF6B35;
+      --bg: #F9F6F0;
+      --card-bg: #FFFFFF;
+      --text: #2B2D42;
+      --gray: #8D99AE;
+      --border: #EDF2F4;
+      --danger-bg: #FFF5F5;
+      --danger-border: #FFA8A8;
+      --danger-text: #E03131;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Pretendard', sans-serif; }
+    body { background-color: var(--bg); color: var(--text); display: flex; justify-content: center; padding: 15px; }
+    
+    .app-container { width: 100%; max-width: 480px; }
+    header { text-align: center; margin-bottom: 15px; }
+    header h1 { color: var(--primary); font-size: 24px; }
+    header p { color: var(--gray); font-size: 13px; margin-top: 4px; }
+
+    .control-panel { 
+      display: flex; justify-content: space-between; align-items: center; 
+      gap: 10px; margin-bottom: 20px; background: white; padding: 12px; 
+      border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    }
+    .control-panel label { font-size: 13px; font-weight: bold; color: var(--gray); }
+    select, input[type="date"] {
+      padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border);
+      background: white; font-size: 13px; outline: none;
+    }
+
+    .time-header {
+      font-size: 18px; font-weight: bold; color: var(--primary);
+      margin-bottom: 15px; padding-bottom: 8px; border-bottom: 2px solid #FFF0EB;
+      text-align: center;
+    }
+
+    /* 세로 3칸 배치 */
+    .friends-vertical-list {
+      display: flex; flex-direction: column; gap: 16px;
+    }
+
+    .friend-card {
+      background: var(--card-bg); border-radius: 16px; padding: 16px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.05); border: 1px solid var(--border);
+    }
+
+    .friend-header {
+      display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;
+    }
+    .friend-name { font-size: 16px; font-weight: bold; color: var(--text); }
+    
+    .skip-label { font-size: 12px; color: var(--gray); display: flex; align-items: center; gap: 4px; cursor: pointer; }
+    .skip-label input { accent-color: var(--primary); cursor: pointer; }
+
+    .image-upload {
+      width: 100%; height: 180px; border-radius: 12px; background: #F8F9FA;
+      border: 2px dashed #DEE2E6; display: flex; justify-content: center;
+      align-items: center; cursor: pointer; overflow: hidden; position: relative;
+    }
+    .image-upload img { width: 100%; height: 100%; object-fit: cover; }
+    .image-upload input { display: none; }
+    .image-placeholder { color: var(--gray); font-size: 13px; text-align: center; }
+
+    .skipped-box {
+      width: 100%; height: 120px; border-radius: 12px; background: var(--danger-bg);
+      border: 2px dashed var(--danger-border); color: var(--danger-text);
+      display: flex; justify-content: center; align-items: center;
+      font-weight: bold; font-size: 15px;
+    }
+
+    .memo-input {
+      width: 100%; margin-top: 10px; padding: 8px 10px; border-radius: 8px;
+      border: 1px solid var(--border); font-size: 13px; outline: none;
+    }
+
+    /* 댓글 영역 */
+    .comments-section { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 8px; }
+    .comment-list { font-size: 12px; margin-bottom: 8px; max-height: 80px; overflow-y: auto; }
+    .comment-item { margin-bottom: 4px; line-height: 1.3; }
+    .comment-item strong { color: var(--primary); }
+
+    .comment-form { display: flex; gap: 6px; }
+    .comment-form select { padding: 4px 6px; font-size: 11px; }
+    .comment-form input { flex: 1; padding: 6px 8px; border-radius: 6px; border: 1px solid var(--border); font-size: 11px; }
+    .comment-form button {
+      padding: 6px 10px; background: var(--primary); color: white; border: none;
+      border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+
+<div class="app-container">
+  <header>
+    <h1>🍚 밥로그</h1>
+    <p>다은 · 영은 · 송연의 삼시세끼 기록장</p>
+  </header>
+
+  <div class="control-panel">
+    <div>
+      <input type="date" id="datePicker">
+    </div>
+    <div>
+      <label>식사: </label>
+      <select id="mealSelect">
+        <option value="breakfast">🍳 아침</option>
+        <option value="lunch">🍱 점심</option>
+        <option value="dinner">🍷 저녁</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="time-header" id="currentMealTitle">🍳 아침 식단</div>
+
+  <!-- 세로 3칸 친구 리스트 -->
+  <div class="friends-vertical-list" id="friendsList"></div>
+</div>
+
+<script>
+  const users = ["다은", "영은", "송연"];
+  const mealTitles = {
+    breakfast: "🍳 아침 식단",
+    lunch: "🍱 점심 식단",
+    dinner: "🍷 저녁 식단"
+  };
+
+  let db = JSON.parse(localStorage.getItem('boblog_v2_db')) || {};
+
+  const datePicker = document.getElementById('datePicker');
+  const mealSelect = document.getElementById('mealSelect');
+  
+  datePicker.value = new Date().toISOString().substring(0, 10);
+
+  datePicker.addEventListener('change', renderApp);
+  mealSelect.addEventListener('change', renderApp);
+
+  function renderApp() {
+    const currentDate = datePicker.value;
+    const currentMeal = mealSelect.value;
+    const friendsList = document.getElementById('friendsList');
+
+    document.getElementById('currentMealTitle').innerText = mealTitles[currentMeal];
+
+    let html = '';
+
+    users.forEach(user => {
+      const data = db[currentDate]?.[currentMeal]?.[user] || { skipped: false, image: null, memo: "", comments: [] };
+
+      html += `
+        <div class="friend-card">
+          <div class="friend-header">
+            <span class="friend-name">👤 ${user}</span>
+            <label class="skip-label">
+              <input type="checkbox" id="skip-${user}" ${data.skipped ? 'checked' : ''} onchange="toggleSkip('${user}')"> 안 먹었어요
+            </label>
+          </div>
+
+          <!-- 입력/사진 영역 -->
+          <div id="content-${user}" style="display: ${data.skipped ? 'none' : 'block'};">
+            <div class="image-upload" onclick="triggerFileInput('${user}')">
+              ${data.image ? 
+                `<img src="${data.image}">` : 
+                `<span class="image-placeholder" id="ph-${user}">+ 사진 추가하기</span>`
+              }
+              <input type="file" id="file-${user}" accept="image/*" onchange="handleImageUpload(event, '${user}')">
+            </div>
+            <input type="text" class="memo-input" id="memo-${user}" 
+              value="${data.memo || ''}" 
+              placeholder="${user}의 메뉴를 입력하세요..." 
+              onchange="saveMemo('${user}')">
+          </div>
+
+          <!-- 안 먹었어요 표시 -->
+          <div id="skipped-${user}" class="skipped-box" style="display: ${data.skipped ? 'flex' : 'none'};">
+            🚫 먹지 않았어요!
+          </div>
+
+          <!-- 댓글 영역 -->
+          <div class="comments-section">
+            <div class="comment-list">
+              ${(data.comments || []).map(c => `<div class="comment-item"><strong>${c.user}:</strong> ${c.text}</div>`).join('')}
+            </div>
+            <div class="comment-form">
+              <select id="comment-author-${user}">
+                ${users.map(u => `<option value="${u}">${u}</option>`).join('')}
+              </select>
+              <input type="text" id="input-comment-${user}" placeholder="댓글 남기기...">
+              <button onclick="addComment('${user}')">등록</button>
+            </div>
+          </div>
+        </div>
+      `;
+    });
+
+    friendsList.innerHTML = html;
+  }
+
+  function initData(date, meal, user) {
+    if (!db[date]) db[date] = {};
+    if (!db[date][meal]) db[date][meal] = {};
+    if (!db[date][meal][user]) db[date][meal][user] = { skipped: false, image: null, memo: "", comments: [] };
+  }
+
+  function triggerFileInput(user) {
+    document.getElementById(`file-${user}`).click();
+  }
+
+  function handleImageUpload(event, user) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const date = datePicker.value;
+      const meal = mealSelect.value;
+      initData(date, meal, user);
+      db[date][meal][user].image = e.target.result;
+      localStorage.setItem('boblog_v2_db', JSON.stringify(db));
+      renderApp();
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function saveMemo(user) {
+    const date = datePicker.value;
+    const meal = mealSelect.value;
+    const memoVal = document.getElementById(`memo-${user}`).value;
+    initData(date, meal, user);
+    db[date][meal][user].memo = memoVal;
+    localStorage.setItem('boblog_v2_db', JSON.stringify(db));
+  }
+
+  function toggleSkip(user) {
+    const date = datePicker.value;
+    const meal = mealSelect.value;
+    const isSkipped = document.getElementById(`skip-${user}`).checked;
+    initData(date, meal, user);
+    db[date][meal][user].skipped = isSkipped;
+    localStorage.setItem('boblog_v2_db', JSON.stringify(db));
+    renderApp();
+  }
+
+  function addComment(targetUser) {
+    const date = datePicker.value;
+    const meal = mealSelect.value;
+    const authorSelect = document.getElementById(`comment-author-${targetUser}`);
+    const author = authorSelect.value;
+    const input = document.getElementById(`input-comment-${targetUser}`);
+    const text = input.value.trim();
+    if (!text) return;
+
+    initData(date, meal, targetUser);
+    db[date][meal][targetUser].comments.push({ user: author, text });
+    localStorage.setItem('boblog_v2_db', JSON.stringify(db));
+    renderApp();
+  }
+
+  // 초기 실행
+  renderApp();
+</script>
+</body>
+</html>
