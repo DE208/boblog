@@ -60,9 +60,9 @@
     .skip-label { font-size: 12px; color: var(--gray); display: flex; align-items: center; gap: 4px; cursor: pointer; }
     .skip-label input { accent-color: var(--primary); cursor: pointer; }
 
-    /* 고화질 가로세로 비율 보존 및 안 깨지는 스타일 설정 */
+    /* 사진 영역 정의 */
     .image-container {
-      position: relative; width: 100%; height: 240px; border-radius: 12px; overflow: hidden; background: #222;
+      position: relative; width: 100%; height: 220px; border-radius: 12px; overflow: hidden;
     }
     
     .image-upload {
@@ -70,8 +70,8 @@
       border: 2px dashed #DEE2E6; display: flex; justify-content: center;
       align-items: center; cursor: pointer; position: relative;
     }
-    /* contain 속성으로 강제 확대/찌그러짐 방지하여 원본 화질을 유지합니다 */
-    .image-upload img { width: 100%; height: 100%; object-fit: contain; background: #000; }
+    /* 요청하신 대로 사진이 영역에 맞춰 확대되어 꽉 차도록 설정 (cover) */
+    .image-upload img { width: 100%; height: 100%; object-fit: cover; }
     .image-upload input { display: none; }
     .image-placeholder { color: var(--gray); font-size: 13px; text-align: center; }
 
@@ -243,6 +243,7 @@
     document.getElementById(`file-${user}`).click();
   }
 
+  // ImgBB 고화질 서비스로 전송 (압축 없이 모바일 원본 고화질 유지)
   async function handleImageUpload(event, user) {
     const file = event.target.files[0];
     if (!file) return;
@@ -250,32 +251,30 @@
     const date = datePicker.value;
     const meal = mealSelect.value;
     const ph = document.getElementById(`ph-${user}`);
-    if (ph) ph.innerText = "고화질 사진 업로드 중...";
+    if (ph) ph.innerText = "고화질 사진 저장 중...";
 
     const formData = new FormData();
     formData.append("image", file);
 
     try {
-      const res = await fetch("https://api.imgur.com/3/image", {
+      // ImgBB 원본 고화질 API 전송
+      const res = await fetch("https://api.imgbb.com/1/upload?key=6d207e02198a847e7b5943864f78281a", {
         method: "POST",
-        headers: {
-          Authorization: "Client-ID 3a92a544158d601"
-        },
         body: formData
       });
 
       const data = await res.json();
 
       if (data.success) {
-        // 원본 선명함을 그대로 유지하는 고화질 이미지 URL 연결
-        const imageUrl = data.data.link;
+        // 원본 해상도 링크 저장
+        const imageUrl = data.data.display_url || data.data.url;
 
         const docRef = db.collection("boblog").doc(`${date}_${meal}`);
         await docRef.set({
           [user]: { image: imageUrl }
         }, { merge: true });
       } else {
-        throw new Error("Imgur 업로드 실패");
+        throw new Error("ImgBB 고화질 저장 실패");
       }
 
     } catch (err) {
