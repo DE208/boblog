@@ -164,8 +164,7 @@
       const mealData = doc.exists ? doc.data() : {};
       renderUI(mealData);
     }, (error) => {
-      console.error("Firestore 에러:", error);
-      alert("데이터를 불러오는데 실패했습니다. Firebase 보안 규칙을 확인해주세요.");
+      alert("Firestore 접속 에러: " + error.message);
     });
   }
 
@@ -226,7 +225,7 @@
     document.getElementById(`file-${user}`).click();
   }
 
-  // 400px 크기로 초경량 압축 (오류 원천 차단)
+  // 250px 초소형 압축 (Firebase 용량 제한 100% 안 걸리게 압축)
   function compressImage(file) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -236,7 +235,7 @@
         img.src = e.target.result;
         img.onload = () => {
           const canvas = document.createElement('canvas');
-          const maxDim = 400; // 가로/세로 최대 400px로 압축
+          const maxDim = 250; 
           let w = img.width;
           let h = img.height;
 
@@ -250,7 +249,7 @@
           canvas.height = h;
           const ctx = canvas.getContext('2d');
           ctx.drawImage(img, 0, 0, w, h);
-          resolve(canvas.toDataURL('image/jpeg', 0.5)); // 화질 50% 압축 (초경량화)
+          resolve(canvas.toDataURL('image/jpeg', 0.4));
         };
         img.onerror = (err) => reject(err);
       };
@@ -265,7 +264,7 @@
     const date = datePicker.value;
     const meal = mealSelect.value;
     const ph = document.getElementById(`ph-${user}`);
-    if (ph) ph.innerText = "사진 최적화 중...";
+    if (ph) ph.innerText = "업로드 중...";
 
     try {
       const compressedDataUrl = await compressImage(file);
@@ -276,8 +275,7 @@
       }, { merge: true });
 
     } catch (err) {
-      console.error(err);
-      alert("업로드 실패! Firebase 콘솔에서 규칙(Rules)이 게시되었는지 확인해주세요.");
+      alert("업로드 에러 상세: " + err.message);
       if (ph) ph.innerText = "+ 사진 추가하기";
     }
   }
